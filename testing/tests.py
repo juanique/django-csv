@@ -70,3 +70,9 @@ class ReadTestCase(TestCase):
 
         for name, obj in results.items():
             self.assertNotEquals(None, obj.pk)
+
+    def test_save_all(self):
+        """It can iterate over the entire file and save al to db"""
+        self.mapping.map_relation(base="city", attribute="country", target="country")
+
+        self.importer.save_all()

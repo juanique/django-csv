@@ -9,8 +9,15 @@ class CSVImporter:
         headers_line = self.file_handler.readline().rstrip()
         self._headers = headers_line.split(self.separator)
 
+    def save_all(self):
+        while self.save_row(self.readline()):
+            pass
+
     def readline(self):
         line = self.file_handler.readline().rstrip()
+        if not line:
+            return None
+
         data_fields = line.split(self.separator)
 
         results = self.mapping.new_resultset()
@@ -39,6 +46,7 @@ class CSVImporter:
             for attribute, target in self.mapping.relations.get(name, {}).items():
                 target_obj = self.save_obj(results, target)
                 setattr(obj, attribute, target_obj)
+
             obj.save()
 
         return obj
@@ -55,12 +63,14 @@ class CSVImporterMapping:
     def __init__(self):
         self.map_dict = {}
         self.relations = {}
+        self.inverse_relations = {}
 
     def map_class(self, instance_name, class_obj):
         self.map_dict[instance_name] = InstanceMapping(class_obj)
 
     def map_relation(self, base, attribute, target):
         self.relations.setdefault(base, {})[attribute] = target
+        self.inverse_relations.setdefault(target, {})[attribute] = base
 
     def new_resultset(self):
         out = {}
