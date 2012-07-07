@@ -19,15 +19,24 @@ class CSVImporter:
             return None
 
         data_fields = line.split(self.separator)
+        data_dict = {}
 
         results = self.mapping.new_resultset()
 
         for i in range(len(data_fields)):
             field_value = data_fields[i]
             header = self._headers[i]
+            data_dict[header] = field_value
 
             instance_name, field_name = tuple(header.split("."))
             setattr(results[instance_name], field_name, field_value)
+
+        for instance_name, lookup_fields in self.mapping.lookups.items():
+            filters = {}
+            for field in lookup_fields:
+                filters[field] = data_dict[".".join([instance_name, field])]
+
+            results[instance_name], created = self.mapping.get_class(instance_name).objects.get_or_create(**filters)
 
         for instance, attributes in self.mapping.relations.items():
             for attribute, target in attributes.items():
@@ -36,8 +45,10 @@ class CSVImporter:
         return results
 
     def save_row(self, results):
-        for name, obj in results.items():
-            self.save_obj(results, name)
+        if results:
+            for name, obj in results.items():
+                self.save_obj(results, name)
+            return True
 
     def save_obj(self, results, name):
         obj = results[name]
@@ -50,6 +61,7 @@ class CSVImporter:
             obj.save()
 
         return obj
+
 class InstanceMapping:
 
     def __init__(self, obj_class):
@@ -63,10 +75,17 @@ class CSVImporterMapping:
     def __init__(self):
         self.map_dict = {}
         self.relations = {}
+        self.lookups = {}
         self.inverse_relations = {}
+
+    def get_class(self,instance_name):
+        return self.map_dict[instance_name].obj_class
 
     def map_class(self, instance_name, class_obj):
         self.map_dict[instance_name] = InstanceMapping(class_obj)
+
+    def add_lookup(self, instance_name, *args):
+        self.lookups[instance_name] = args
 
     def map_relation(self, base, attribute, target):
         self.relations.setdefault(base, {})[attribute] = target
